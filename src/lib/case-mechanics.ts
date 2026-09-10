@@ -62,7 +62,21 @@ export function priceRarity(priceInThousands:number){return priceInThousands<=40
 export function createSpinProfile(random = Math.random) {
  return {durationMs:7500+Math.floor(random()*2001),tiles:30+Math.floor(random()*11),friction:2.7+random()*.6};
 }
-export function spinProgress(progress:number,friction:number) {
- const p=Math.max(0,Math.min(1,progress));
- return 1-Math.pow(1-p,friction);
+export function spinProgress(
+  progress: number,
+  friction: number
+) {
+  const normalizedProgress = Math.max(
+    0,
+    Math.min(1, progress)
+  );
+
+  return (
+    1 -
+    Math.pow(
+      1 - normalizedProgress,
+      friction
+    )
+  );
+}
 }
