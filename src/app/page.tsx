@@ -1,5 +1,7 @@
-// CS:GO Panorama timing reconstructed from popup_capability_decodable.js/.css.
-// Reference: https://github.com/Desynci/CSGO_Panorama_Code.pbin
+// CS:GO Panorama timing reconstructed from
+// popup_capability_decodable.js/.css.
+// Reference:
+// https://github.com/Desynci/CSGO_Panorama_Code.pbin
 
 export const OPENING_DELAY_MS = 2400;
 export const SPIN_DURATION_MS = 6000;
@@ -55,13 +57,13 @@ export const TARGET_LUNCH_PRICE = 50;
 // Mức phân tán giá.
 export const LOG_PRICE_SPREAD = 0.35;
 
-// Món được ưu tiên.
+// Tên món đặc biệt.
 export const SPECIAL_MEAL_NAME = "Anh Hưng";
 
-// 0.5 tương ứng với 50%.
+// Xác suất 50%.
 export const SPECIAL_MEAL_PROBABILITY = 0.5;
 
-export function caseEase(progress: number) {
+export function caseEase(progress: number): number {
   const p = Math.max(0, Math.min(1, progress));
 
   let lo = 0;
@@ -98,6 +100,17 @@ type PricedMeal = {
   price: number;
   rarity: number;
 };
+
+function normalizeMealName(name: string): string {
+  return name.trim().normalize("NFC").toLocaleLowerCase("vi");
+}
+
+function isSpecialMeal<T extends PricedMeal>(food: T): boolean {
+  return (
+    normalizeMealName(food.name) ===
+    normalizeMealName(SPECIAL_MEAL_NAME)
+  );
+}
 
 export function createFoodSelector<T extends PricedMeal>(
   population: T[],
@@ -136,35 +149,37 @@ export function createFoodSelector<T extends PricedMeal>(
   }
 
   /*
-   * Mỗi mức giá có tổng trọng số bằng nhau.
-   * Nếu nhiều món có cùng giá, trọng số của mức giá đó
-   * được chia cho các món.
+   * Đếm số món theo từng mức giá.
+   * Nhiều món cùng giá sẽ chia trọng số của mức giá đó.
    */
   const counts = new Map<number, number>();
 
   population.forEach(food => {
     counts.set(
       food.price,
-      (counts.get(food.price) || 0) + 1
+      (counts.get(food.price) ?? 0) + 1
     );
   });
 
   const logs = population.map(food =>
-    Math.log(food.price / 50)
+    Math.log(food.price / TARGET_LUNCH_PRICE)
   );
 
   const prior = logs.map((value, index) => {
-    const numberOfMealsAtPrice =
-      counts.get(population[index].price) || 1;
+    const countAtPrice =
+      counts.get(population[index].price) ?? 1;
 
     return (
       -0.5 *
-        (value / LOG_PRICE_SPREAD) ** 2 -
-      Math.log(numberOfMealsAtPrice)
+        Math.pow(
+          value / LOG_PRICE_SPREAD,
+          2
+        ) -
+      Math.log(countAtPrice)
     );
   });
 
-  function calculateWeights(tilt: number) {
+  function calculateWeights(tilt: number): number[] {
     const logits = logs.map(
       (value, index) =>
         prior[index] + tilt * value
@@ -172,74 +187,40 @@ export function createFoodSelector<T extends PricedMeal>(
 
     const anchor = Math.max(...logits);
 
-    const rawWeights = logits.map(value =>
-      Math.exp(value - anchor)
+    const unnormalizedWeights = logits.map(
+      value => Math.exp(value - anchor)
     );
 
-    const totalWeight = rawWeights.reduce(
-      (total, value) => total + value,
-      0
-    );
+    const totalWeight =
+      unnormalizedWeights.reduce(
+        (total, value) => total + value,
+        0
+      );
 
-    return rawWeights.map(
+    if (
+      !Number.isFinite(totalWeight) ||
+      totalWeight <= 0
+    ) {
+      throw new Error("Invalid probability total");
+    }
+
+    return unnormalizedWeights.map(
       value => value / totalWeight
     );
   }
 
-  const calculateMean = (weights: number[]) =>
-    population.reduce(
+  function calculateMean(weights: number[]): number {
+    return population.reduce(
       (total, food, index) =>
         total + food.price * weights[index],
       0
     );
+  }
 
-  let rawProbabilities: number[];
+  let baseProbabilities: number[];
 
   if (
     target === minimumPrice ||
     target === maximumPrice
   ) {
-    const numberAtTarget =
-      counts.get(target) || 1;
-
-    rawProbabilities = population.map(food =>
-      food.price === target
-        ? 1 / numberAtTarget
-        : 0
-    );
-  } else {
-    let lowTilt = -1;
-    let highTilt = 1;
-
-    while (
-      calculateMean(
-        calculateWeights(lowTilt)
-      ) > target
-    ) {
-      lowTilt *= 2;
-    }
-
-    while (
-      calculateMean(
-        calculateWeights(highTilt)
-      ) < target
-    ) {
-      highTilt *= 2;
-    }
-
-    for (let i = 0; i < 80; i++) {
-      const middleTilt =
-        (lowTilt + highTilt) / 2;
-
-      if (
-        calculateMean(
-          calculateWeights(middleTilt)
-        ) < target
-      ) {
-        lowTilt = middleTilt;
-      } else {
-        highTilt = middleTilt;
-      }
-    }
-
-    rawProbabilities 
+    const 
