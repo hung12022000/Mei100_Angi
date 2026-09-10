@@ -9,13 +9,14 @@ export const foods:Food[]=[
     "image": 0,
     "quip": "Sườn có thể gãy. Kèo này thì không."
   },
-   {
-    "name": "Anh Hưng",
-    "sub": "Món ăn đẳng cấp của Mei",
-    "price": 500,
-    "image": "avt1202",
-    "quip": "Một pha gắp chả đi vào lòng người."
-  },
+{
+  name: "Anh Hưng",
+  sub: "Món ăn đẳng cấp của Mei",
+  price: 500,
+  image: 3,
+  customImage: "avt1202.jpg",
+  quip: "Một a vào lòng người."
+},
   {
     "name": "Phở bò",
     "sub": "Tái nạm • Việt Nam",
