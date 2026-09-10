@@ -9,6 +9,13 @@ export const foods:Food[]=[
     "image": 0,
     "quip": "Sườn có thể gãy. Kèo này thì không."
   },
+   {
+    "name": "Anh Hưng",
+    "sub": "Món ăn đẳng cấp của Mei",
+    "price": 500,
+    "image": 3,
+    "quip": "Một pha gắp chả đi vào lòng người."
+  },
   {
     "name": "Phở bò",
     "sub": "Tái nạm • Việt Nam",
