@@ -13,7 +13,7 @@ export const foods:Food[]=[
     "name": "Anh Hưng",
     "sub": "Món ăn đẳng cấp của Mei",
     "price": 500,
-    "image": 3,
+    "image": "avt1202",
     "quip": "Một pha gắp chả đi vào lòng người."
   },
   {
