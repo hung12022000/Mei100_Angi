@@ -1,14 +1,10 @@
 import { readCookie, writeCookie } from '@/lib/cookies';
-import { createSpinProfile } from '@/lib/case-mechanics';
+import {
+  createSpinProfile,
+  stopFraction,
+  spinProgress
+} from '@/lib/case-mechanics';
 import { foods, type Food } from '@/lib/foods';
-
-function getCustomFoodImage(food: Food): string | null {
-  if (!food.customImage) {
-    return null;
-  }
-
-  return `${import.meta.env.BASE_URL}${food.customImage}`;
-}
 import { copy, foodName, foodSubtitle, priceLabel, type Language } from '@/lib/i18n';
 import { useLocalSpinCount } from '@/hooks/use-local-spin-count';
 import { PreferencesPanel } from '@/components/preferences-panel';
@@ -22,6 +18,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 
+function getCustomFoodImage(food: Food): string | null {
+  if (!food.customImage) {
+    return null;
+  }
+  return `${import.meta.env.BASE_URL}${food.customImage}`;
+}
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 
@@ -96,7 +98,9 @@ export default function Home(){
   const start=position.current;
   const center=Math.floor((width/2-start)/step);
   const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const profile=createSpinProfile(Math.random,reducedMotion);
+const profile = createSpinProfile(
+  Math.random
+);
   const target=center+profile.tiles;
   const end=width/2-tileWidth*stopFraction()-target*step;
   // Keep visible cards at permanent world coordinates. Generate new cards
