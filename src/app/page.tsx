@@ -223,4 +223,401 @@ export function createFoodSelector<T extends PricedMeal>(
     target === minimumPrice ||
     target === maximumPrice
   ) {
-    const 
+    const countAtTarget = counts.get(target) ?? 1;
+
+    baseProbabilities = population.map(food =>
+      food.price === target
+        ? 1 / countAtTarget
+        : 0
+    );
+  } else {
+    let lowTilt = -1;
+    let highTilt = 1;
+
+    while (
+      calculateMean(
+        calculateWeights(lowTilt)
+      ) > target
+    ) {
+      lowTilt *= 2;
+    }
+
+    while (
+      calculateMean(
+        calculateWeights(highTilt)
+      ) < target
+    ) {
+      highTilt *= 2;
+    }
+
+    for (let i = 0; i < 80; i++) {
+      const middleTilt =
+        (lowTilt + highTilt) / 2;
+
+      const middleMean = calculateMean(
+        calculateWeights(middleTilt)
+      );
+
+      if (middleMean < target) {
+        lowTilt = middleTilt;
+      } else {
+        highTilt = middleTilt;
+      }
+    }
+
+    baseProbabilities = calculateWeights(
+      (lowTilt + highTilt) / 2
+    );
+  }
+
+  /*
+   * Lưu trọng số cơ bản theo giá.
+   * Phần choose() sẽ dành riêng 50% cho món Anh Hưng.
+   */
+  const baseProbabilityMap = new Map<T, number>(
+    population.map((food, index) => [
+      food,
+      baseProbabilities[index]
+    ])
+  );
+
+  /*
+   * Tạo bảng xác suất để các phần khác của ứng dụng
+   * có thể đọc và hiển thị.
+   */
+  const specialMeal = population.find(isSpecialMeal);
+
+  const effectiveProbabilities = new Map<T, number>();
+
+  if (specialMeal && population.length > 1) {
+    const otherMeals = population.filter(
+      food => food !== specialMeal
+    );
+
+    const otherBaseTotal = otherMeals.reduce(
+      (total, food) =>
+        total +
+        (baseProbabilityMap.get(food) ?? 0),
+      0
+    );
+
+    effectiveProbabilities.set(
+      specialMeal,
+      SPECIAL_MEAL_PROBABILITY
+    );
+
+    if (otherBaseTotal > 0) {
+      otherMeals.forEach(food => {
+        const baseWeight =
+          baseProbabilityMap.get(food) ?? 0;
+
+        effectiveProbabilities.set(
+          food,
+          (baseWeight / otherBaseTotal) *
+            (1 - SPECIAL_MEAL_PROBABILITY)
+        );
+      });
+    } else {
+      const probabilityPerMeal =
+        (1 - SPECIAL_MEAL_PROBABILITY) /
+        otherMeals.length;
+
+      otherMeals.forEach(food => {
+        effectiveProbabilities.set(
+          food,
+          probabilityPerMeal
+        );
+      });
+    }
+  } else {
+    population.forEach(food => {
+      effectiveProbabilities.set(
+        food,
+        baseProbabilityMap.get(food) ?? 0
+      );
+    });
+  }
+
+  function validateRandomDraw(randomDraw: number): void {
+    if (
+      !Number.isFinite(randomDraw) ||
+      randomDraw < 0 ||
+      randomDraw >= 1
+    ) {
+      throw new Error(
+        "Random draw must be in [0,1)"
+      );
+    }
+  }
+
+  function getBaseWeights(items: T[]) {
+    if (!items.length) {
+      throw new Error("No eligible meals");
+    }
+
+    const weights = items.map(food => {
+      const probability =
+        baseProbabilityMap.get(food);
+
+      if (probability === undefined) {
+        throw new Error("Unknown meal");
+      }
+
+      return probability;
+    });
+
+    return {
+      weights,
+      totalWeight: weights.reduce(
+        (total, weight) => total + weight,
+        0
+      )
+    };
+  }
+
+  function getEffectiveWeights(items: T[]) {
+    if (!items.length) {
+      throw new Error("No eligible meals");
+    }
+
+    const eligibleSpecialMeal =
+      items.find(isSpecialMeal);
+
+    /*
+     * Nếu món Anh Hưng nằm trong danh sách được phép quay,
+     * dành đúng 50% trọng số cho món đó.
+     */
+    if (eligibleSpecialMeal && items.length > 1) {
+      const otherMeals = items.filter(
+        food => food !== eligibleSpecialMeal
+      );
+
+      const {
+        weights: otherBaseWeights,
+        totalWeight: otherBaseTotal
+      } = getBaseWeights(otherMeals);
+
+      const weights = items.map(food => {
+        if (food === eligibleSpecialMeal) {
+          return SPECIAL_MEAL_PROBABILITY;
+        }
+
+        const otherIndex =
+          otherMeals.indexOf(food);
+
+        if (otherBaseTotal > 0) {
+          return (
+            (otherBaseWeights[otherIndex] /
+              otherBaseTotal) *
+            (1 - SPECIAL_MEAL_PROBABILITY)
+          );
+        }
+
+        return (
+          (1 - SPECIAL_MEAL_PROBABILITY) /
+          otherMeals.length
+        );
+      });
+
+      return {
+        weights,
+        totalWeight: 1
+      };
+    }
+
+    /*
+     * Nếu chỉ còn duy nhất món Anh Hưng,
+     * xác suất món đó là 100%.
+     */
+    if (eligibleSpecialMeal && items.length === 1) {
+      return {
+        weights: [1],
+        totalWeight: 1
+      };
+    }
+
+    /*
+     * Nếu món Anh Hưng bị tắt hoặc không có trong danh sách,
+     * quay theo thuật toán giá thông thường.
+     */
+    const {
+      weights: baseWeights,
+      totalWeight: baseTotal
+    } = getBaseWeights(items);
+
+    if (baseTotal <= 0) {
+      const equalProbability = 1 / items.length;
+
+      return {
+        weights: items.map(
+          () => equalProbability
+        ),
+        totalWeight: 1
+      };
+    }
+
+    const normalizedWeights = baseWeights.map(
+      weight => weight / baseTotal
+    );
+
+    return {
+      weights: normalizedWeights,
+      totalWeight: 1
+    };
+  }
+
+  function chooseFromWeights(
+    items: T[],
+    weights: number[],
+    randomDraw: number
+  ): T {
+    let remaining = randomDraw;
+
+    for (let index = 0; index < items.length; index++) {
+      remaining -= weights[index];
+
+      if (remaining < 0) {
+        return items[index];
+      }
+    }
+
+    /*
+     * Xử lý sai số số thực.
+     */
+    for (
+      let index = items.length - 1;
+      index >= 0;
+      index--
+    ) {
+      if (weights[index] > 0) {
+        return items[index];
+      }
+    }
+
+    throw new Error("Invalid probability total");
+  }
+
+  const expectedPrice = population.reduce(
+    (total, food) =>
+      total +
+      food.price *
+        (effectiveProbabilities.get(food) ?? 0),
+    0
+  );
+
+  return {
+    probabilities: effectiveProbabilities,
+
+    expectedPrice,
+
+    meanFor(items: T[]): number {
+      const {
+        weights,
+        totalWeight
+      } = getEffectiveWeights(items);
+
+      if (totalWeight <= 0) {
+        throw new Error(
+          "Eligible meals have no probability"
+        );
+      }
+
+      return items.reduce(
+        (total, food, index) =>
+          total +
+          food.price *
+            (weights[index] / totalWeight),
+        0
+      );
+    },
+
+    choose(
+      items: T[],
+      random = Math.random
+    ): T {
+      const randomDraw = random();
+
+      validateRandomDraw(randomDraw);
+
+      const {
+        weights,
+        totalWeight
+      } = getEffectiveWeights(items);
+
+      if (totalWeight <= 0) {
+        throw new Error(
+          "Eligible meals have no probability"
+        );
+      }
+
+      const normalizedWeights = weights.map(
+        weight => weight / totalWeight
+      );
+
+      return chooseFromWeights(
+        items,
+        normalizedWeights,
+        randomDraw
+      );
+    }
+  };
+}
+
+export function stopFraction(
+  random = Math.random
+): number {
+  return (
+    Math.floor(random() * 81) + 10
+  ) / 100;
+}
+
+export function priceRarity(
+  priceInThousands: number
+): number {
+  return priceInThousands <= 40
+    ? 0
+    : priceInThousands <= 65
+      ? 1
+      : priceInThousands <= 100
+        ? 2
+        : priceInThousands <= 130
+          ? 3
+          : 4;
+}
+
+/*
+ * Hiệu ứng chuyển động độc lập với kết quả món ăn.
+ * Các giá trị dưới đây chỉ thay đổi animation.
+ */
+export function createSpinProfile(
+  random = Math.random
+) {
+  return {
+    durationMs:
+      7500 + Math.floor(random() * 2001),
+
+    tiles:
+      30 + Math.floor(random() * 11),
+
+    friction:
+      2.7 + random() * 0.6
+  };
+}
+
+export function spinProgress(
+  progress: number,
+  friction: number
+): number {
+  const normalizedProgress = Math.max(
+    0,
+    Math.min(1, progress)
+  );
+
+  return (
+    1 -
+    Math.pow(
+      1 - normalizedProgress,
+      friction
+    )
+  );
+}
