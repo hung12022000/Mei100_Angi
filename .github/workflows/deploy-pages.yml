@@ -1,9 +1,10 @@
-name: Deploy GitHub Pages
+name: Deploy Mei100 Angi to GitHub Pages
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,50 +12,49 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
   build:
+    name: Build website
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+      - name: Install dependencies with npm
+        run: |
+          rm -rf node_modules
+          npm install
 
-      - name: Approve build scripts
-        run: pnpm approve-builds || true
+      - name: Build website for GitHub Pages
+        run: npm run build -- --base=/Mei100_Angi/
 
-      - name: Build
-        run: pnpm build
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload website artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: ./dist
 
   deploy:
-    environment:
-      name: github-pages
-
+    name: Deploy website
     needs: build
-
     runs-on: ubuntu-latest
 
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - name: Deploy
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-``
