@@ -3,7 +3,7 @@ import {readCookie,writeCookie} from '@/lib/cookies';
 import { createSpinProfile, spinProgress, createFoodSelector, stopFraction } from '@/lib/case-mechanics';
 import { foods, type Food } from "@/lib/foods";
 function getCustomFoodImage(food: Food): string | null {
-  if (!food.customImage) {
+  if (!food.customImage) { 
     return null;
   }
 
